@@ -1,27 +1,44 @@
-//JotaroKujo0525 note, this is a deed that i should've done a long time ago
-require('dotenv').config()
+require('dotenv').config();
 
-const DiscordMusicBot = require("./lib/DiscordMusicBot");
-const { exec } = require("child_process");
+const { Client, Intents } = require('discord.js');
+const fs = require('fs'); // Required for file system operations
+const config = require('./config');
 
-if (process.env.REPL_ID) {
-	console.log("Replit system detected, initiating special `unhandledRejection` event listener.")
-	process.on('unhandledRejection', (reason, promise) => {
-		promise.catch((err) => {
-			if (err.status === 429) {
-				console.log("something went wrong whilst trying to connect to discord gateway, resetting...");
-				exec("kill 1");
-			}
-		});
-	});
+const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES] });
+
+async function changeBotAvatar(filePath) {
+    try {
+        const avatarData = fs.readFileSync(filePath); // Read the GIF file
+        await client.user.setAvatar(avatarData); // Set the bot's avatar to the GIF
+        console.log('Bot avatar changed successfully.');
+    } catch (error) {
+        console.error('Error changing bot avatar:', error);
+    }
 }
 
-const client = new DiscordMusicBot();
+client.on('ready', () => {
+    console.log(`Logged in as ${client.user.tag}!`);
+});
 
-console.log("Make sure to fill in the config.js before starting the bot.");
+client.on('messageCreate', async message => {
+    if (!message.content.startsWith(config.prefix) || message.author.bot) return;
 
-const getClient = () => client;
+    const args = message.content.slice(config.prefix.length).trim().split(/ +/);
+    const command = args.shift().toLowerCase();
 
-module.exports = {
-	getClient,
-};
+    if (command === 'changeavatar') {
+        if (!message.member.permissions.has('ADMINISTRATOR')) {
+            return message.reply('You do not have permission to use this command.');
+        }
+
+        const gifFilePath = args[0]; // Assuming the first argument is the path to the GIF file
+        if (!gifFilePath) {
+            return message.reply('Please provide a path to the GIF file.');
+        }
+
+        changeBotAvatar(gifFilePath);
+        message.reply('Bot avatar change requested. Check the console for status.');
+    }
+});
+
+client.login(config.token);
